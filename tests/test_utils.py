@@ -1,6 +1,11 @@
-import dl_from_scratch
+from dl_from_scratch.utils import dataloader
+
+import numpy as np
 import pytest
 
+print(np.shape(dataloader.load_image("tests/samples/0.png")))
+
 def test_read_img():
-    SAMPLE_PATH = "tests/samples/MNIST0.png"
-    assert type(dl_from_scratch.utils.reader.read_img(SAMPLE_PATH)) == np.float64
+    SAMPLE_IMAGE = "tests/samples/0.png"
+    assert type(dataloader.load_image(SAMPLE_SAMPLE)) == np.ndarray
+    assert dataloader.load_image(SAMPLE_SAMPLE) == (20, 20)
