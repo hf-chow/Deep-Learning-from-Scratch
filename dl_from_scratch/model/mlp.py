@@ -23,9 +23,12 @@ import matplotlib.pyplot as plt
 
 def acc_loss_plot(accuracies, losses):
     x = list(range(1,len(accuracies)+1))
-    plt.ylim(0, 1)
-    plt.plot(x, accuracies,label="Accuracy")
-    plt.plot(x, losses,label="Loss")
+
+    fig, ax1 = plt.subplots()
+    ax1.plot(x, accuracies,label="Accuracy")
+
+    ax2 = ax1.twinx()
+    ax2.plot(x, losses,label="Loss")
     plt.savefig("plot.png")
 
 def logsumexp(x):
@@ -68,12 +71,11 @@ def d_softmax(x):
     ex = np.exp(x-x.max())
     return ex/np.sum(ex, axis=0)*(1-ex/np.sum(ex, axis=0))
 
-#def cross_entropy_loss(pred, label):
-#    label_oh = (label[:, np.newaxis] == np.arange(10)).astype(int)
-#    pred_oh = (pred[:, np.newaxis] == np.arange(10)).astype(int)
-#    print(np.log(pred_oh))
-#    loss_sample =(np.log(pred_oh) * label_oh).sum(axis=1)
-#    loss = -np.mean(loss_sample)
+def cross_entropy_loss(pred, label):
+    label_oh = (label[:, np.newaxis] == np.arange(10)).astype(int)
+    loss_sample =(np.log(pred) * label_oh).sum(axis=1)
+    loss = -np.mean(loss_sample)
+    return loss
 
 def SGD(l1, l2, d_l1, d_l2, lr=1e-3):
     l1 = l1 - lr*d_l1
@@ -89,8 +91,6 @@ def forward_backward(x, y, l1, l2):
     x_l2 =  l1_out.dot(l2)
     x_out = softmax(x_l2)
 
-    x_loss = (label*x_out).mean(axis=1)
-
     # Backward
     d_sm = d_softmax(x_l2)
     x_out_error = 2*d_sm*(x_out-label)/x_out.shape[0]
@@ -98,7 +98,7 @@ def forward_backward(x, y, l1, l2):
     d_l2_error = ((l2).dot(x_out_error.T)).T*d_sigmoid(x_l1)
     d_l1 = x.T.dot(d_l2_error)
 
-    return x_out, x_loss, d_l1, d_l2
+    return x_out, d_l1, d_l2
 
 def train():
     PATH = "../../data/MNIST/test.hdf5"
@@ -107,7 +107,7 @@ def train():
     l1 = init_layer(784, 128, mode="uniform")
     l2 = init_layer(128, 10, mode="uniform")
 
-    epochs = 1000
+    epochs = 10000
     batch_size = 128
 
     losses = []
@@ -117,13 +117,12 @@ def train():
         sample = np.random.randint(0, x_train.shape[0], size=(batch_size))
         x = x_train[sample].reshape((-1, 28*28))
         y = y_train[sample]
-        x_out, x_loss, d_l1, d_l2 = forward_backward(x, y, l1, l2)
+        x_out , d_l1, d_l2 = forward_backward(x, y, l1, l2)
         l1, l2 = SGD(l1, l2, d_l1, d_l2)
-
 
         pred = np.argmax(x_out,axis=1)
         acc = (pred == y).mean()
-        loss = x_loss.mean()
+        loss = cross_entropy_loss(x_out, y)
 
         losses.append(loss)
         accuracies.append(acc)
