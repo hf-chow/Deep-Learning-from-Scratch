@@ -1,154 +1,111 @@
-from dl_from_scratch.utils.dataloader import load_hdf5
+import torch
+import torch.nn as nn
+from torchvision import datasets
+from torchvision.transforms import ToTensor
+from torch.utils.data import DataLoader
 
-from math import log
 
-from typing import Callable 
-from tqdm import tqdm
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
+# Building a MLP with pytorch
+# The architecture would be mirroring mlp_numpy.py
 
-def acc_loss_plot(accuracies, losses):
-    x = list(range(1,len(accuracies)+1))
+device = (
+          "cuda" if torch.cuda.is_available() 
+          else "mps" if torch.backends.mps.is_available()
+          else "cpu"
+          )
 
-    fig, ax1 = plt.subplots()
-    ax1.plot(x, accuracies,label="Accuracy")
+def load_mnist(save_path):
+    train_data = datasets.MNIST(
+                    root=save_path,
+                    download=True, 
+                    train=True,
+                    transform=ToTensor()
+                           )
+    test_data = datasets.MNIST(
+                    root=save_path,
+                    download=True,
+                    train=False,
+                    transform=ToTensor()
+                    )
+    return train_data, test_data
 
-    ax2 = ax1.twinx()
-    ax2.plot(x, losses,label="Loss", color="orange")
+class MLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.flatten = nn.Flatten()
+        self.mlp = nn.Sequential(
+                nn.Linear(28*28, 128),
+                nn.ReLU(),
+                nn.Linear(128, 10)
+            )
+    def forward(self, x):
+        x = self.flatten(x)
+        logits = self.mlp(x)
+        return logits
 
-    plt.savefig("plot.png")
+def dataloader(train, test, batch_size):
+    train_dataloader = DataLoader(train, batch_size=batch_size)
+    test_dataloader = DataLoader(test, batch_size=batch_size)
+    return train_dataloader, test_dataloader
 
-def logsumexp(x):
-    c = x.max(axis=1)
-    return c + np.log(np.exp(x-c.reshape((-1, 1))).sum(axis=1))
+def train(model, dataloader, loss_func, optim):
+    # Set model to training mode, instead of evaluation mode
+    model.train()
 
-def sigmoid(x):
-    return 1 / (1+np.exp(-x))
+    for batch, (x, y) in enumerate(dataloader):
 
-def d_sigmoid(x):
-    return (np.exp(-x))/((np.exp(-x)+1)**2)
+        x, y = x.to(device), y.to(device)
+        pred = model(x)
+        loss = loss_func(pred, y)
 
-def relu(x):
-    return np.maximum(x, 0)
+        loss.backward()
+        # Perform optimization (e.g. gradient descend)
+        optim.step()
+        # Resetting grads for the next epoch
+        optim.zero_grad()
 
-def d_relu(x):
-    x[x <= 0] = 0
-    x[x > 0] = 1
-    return x
+        # Print status every 100 epochs
+        train_size = len(dataloader.dataset)
+        if batch % 100 == 0:
+            loss = loss.item() # .item returns the values of the tensor as a Python float
+            current_prog = (batch + 1)*len(x)
 
-def map_labels(label):
-    result = np.zeros((10, 1))
-    result[label] = 1
-    return result
+            print(f"Current loss: {loss} || Progress {current_prog}/{train_size}")
 
-def init_layer(input_shape, output_shape, mode="gaussian") -> np.array:
-    # for MNIST, the layer 1 has input of 784 nodes, layer 2 has input of 128
-    # hence the weight of layer 1 is a (784, 128) np array
-    # to initialize the weight, we need to randomize the number and and redistribute 
-    # the magnitude such that one randomized node is not statistically more important 
-    # than another at the beginning, so as to not mislead the model
-    # We will use the Gaussian initialization 
-    # Gaussian distribution has a standard deviation of sqrt(2/n), where n 
-    # is the nubmer of samples
-    if mode == "gaussian":
-        std = np.sqrt(2/(input_shape*output_shape))
-        weight = np.random.rand(input_shape, output_shape)
-        scaled_weight = np.multiply(weight, std)
-    if mode == "uniform":
-        scaled_weight = np.random.uniform(-1., 1., size=(input_shape, output_shape))/np.sqrt(input_shape*output_shape)
-    return scaled_weight
+def test(model, dataloader, loss_func):
+    # Set model to evaluation mode
+    model.eval()
+    loss , correct = 0, 0
+    with torch.no_grad(): # Stop Pytorch from accumulating grads, which it does by default
+        for x, y in dataloader:
+            x, y = x.to(device), y.to(device)
+            pred = model(x)
+            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            loss += loss_func(pred, y).item()
+    loss /= len(dataloader)
+    correct /= len(dataloader.dataset)
+    print(f"Accuracy: {(correct*100):0.1f}% || Average loss: {loss:8f}\n")
 
-def softmax(x):
-    ex = np.exp(x)
-    return ex / np.sum(ex)
-
-def d_softmax(x):
-    ex = np.exp(x-x.max())
-    return ex/np.sum(ex, axis=0)*(1-ex/np.sum(ex, axis=0))
-
-def cross_entropy_loss(pred, label):
-    label_oh = (label[:, np.newaxis] == np.arange(10)).astype(int)
-    loss_sample =(np.log(pred) * label_oh).sum(axis=1)
-    loss = -np.mean(loss_sample)
-    return loss
-
-def SGD(l1, l2, d_l1, d_l2, lr=1e-3):
-    l1 = l1 - lr*d_l1
-    l2 = l2 - lr*d_l2
-    return l1, l2
-
-#TODO Refactor training loop to cater for different activation functions
-def forward_backward(x, y, l1, l2):
-    # Forward  
-    label = np.zeros((len(y), 10))
-    label[range(label.shape[0]), y] = 1
-    x_l1 = x.dot(l1)
-
-    out = np.zeros((len(y), 10), np.float32)
-    out[range(out.shape[0]), y] = 1
-
-    # Sigmoid
-#    l1_out = sigmoid(x_l1)
-    # relu
-#    l1_out = relu(x_l1)
-    l1_out = np.maximum(x_l1, 0)
-
-    x_l2 =  l1_out.dot(l2)
-#    x_out = softmax(x_l2)
-    x_lsm = x_l2 - logsumexp(x_l2).reshape((-1, 1))
-    x_loss = (-out * x_lsm).mean(axis=1)
-    
-    # Backward
-    d_out = -out/len(y)
-    dx_lsm = d_out - np.exp(x_lsm)*d_out.sum(axis=1).reshape((-1, 1))
-#    d_sm = d_softmax(x_l2)
-#    x_out_error = 2*d_sm*(x_out-label)/x_out.shape[0]
-#    d_l2 = l1_out.T.dot(x_out_error)
-    d_l2 = l1_out.T.dot(dx_lsm)
-    dx_relu = dx_lsm.dot(l2.T)
-
-#    d_l2_error = ((l2).dot(x_out_error.T)).T*d_sigmoid(x_l1)
-#    d_l2_error = ((l2).dot(x_out_error.T)).T*d_relu(x_l1)
-    dx_l1 = (l1_out > 0).astype(np.float32)*dx_relu
-    d_l1 = x.T.dot(dx_l1)
-
-    return x_l2, x_loss, d_l1, d_l2
-
-def train():
-    PATH = "../../data/MNIST/train.hdf5"
-    x_train, y_train = load_hdf5(PATH)
-#    TRAIN_PATH = "../../data/MNIST/train.csv"
-#    y_train = pd.read_csv(TRAIN_PATH)["label"]
-#    x_train = pd.read_csv(TRAIN_PATH).drop(labels=["label"], axis=1)
-
-#    print(x_train.head())
-    
-    l1 = init_layer(784, 128, mode="uniform")
-    l2 = init_layer(128, 10, mode="uniform")
-
-    epochs = 1000
+def main():
+    PATH = "../../data/MNIST/"
     batch_size = 128
+    epochs = 20 
 
-    losses = []
-    accuracies = []
+    print(f"Using {device} for trainig")
+    model = MLP().to(device)
+    print(model)
+    loss_func = nn.CrossEntropyLoss()
+    optim = torch.optim.SGD(model.parameters(), lr=1e-3)
 
-    for i in tqdm(range(epochs)):
-        sample = np.random.randint(0, x_train.shape[0], size=(batch_size))
-        x = x_train[sample].reshape((-1, 28*28))
-        y = y_train[sample]
-        x_l2, x_loss, d_l1, d_l2 = forward_backward(x, y, l1, l2)
-        l1, l2 = SGD(l1, l2, d_l1, d_l2)
+    train_data, test_data = load_mnist(save_path=PATH)
+    train_dataloader, test_dataloader = dataloader(train_data, test_data, batch_size)
 
-        pred = np.argmax(x_l2,axis=1)
-        acc = (pred == y).mean()
-        loss = x_loss.mean()
+    for i in range(epochs):
+        print(f"Epoch {i+1}")
+        train(model, train_dataloader, loss_func=loss_func, optim=optim)
+        test(model, test_dataloader, loss_func=loss_func)
 
-        losses.append(loss)
-        accuracies.append(acc)
+#    load_mnist()
 
-    acc_loss_plot(accuracies, losses)
-          
-
-if __name__ == "__main__":
-    train()
+if __name__ ==  "__main__":
+    main()
