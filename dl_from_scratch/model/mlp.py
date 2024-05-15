@@ -1,3 +1,5 @@
+from dl_from_scratch.utils.plot import acc_loss_plot
+
 import torch
 import torch.nn as nn
 from torchvision import datasets
@@ -5,8 +7,8 @@ from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 
 
-# Building a MLP with pytorch
-# The architecture would be mirroring mlp_numpy.py
+# Building a M100100100LP with pytorch
+# The architecture woul100d be mirroring mlp_numpy.py
 
 device = (
           "cuda" if torch.cuda.is_available() 
@@ -52,6 +54,7 @@ def train(model, dataloader, loss_func, optim):
     # Set model to training mode, instead of evaluation mode
     model.train()
 
+    loss, acc = 0, 0
     for batch, (x, y) in enumerate(dataloader):
 
         x, y = x.to(device), y.to(device)
@@ -64,27 +67,34 @@ def train(model, dataloader, loss_func, optim):
         # Resetting grads for the next epoch
         optim.zero_grad()
 
+        loss = loss.item() # .item returns the values of the tensor as a Python float
+        acc += (pred.argmax(1) == y).type(torch.float).sum().item()
+
         # Print status every 100 epochs
         train_size = len(dataloader.dataset)
         if batch % 100 == 0:
-            loss = loss.item() # .item returns the values of the tensor as a Python float
             current_prog = (batch + 1)*len(x)
-
             print(f"Current loss: {loss} || Progress {current_prog}/{train_size}")
+
+    loss /= len(dataloader)
+    acc /= len(dataloader.dataset)
+    return acc, loss
 
 def test(model, dataloader, loss_func):
     # Set model to evaluation mode
     model.eval()
-    loss , correct = 0, 0
+    loss , acc = 0, 0
     with torch.no_grad(): # Stop Pytorch from accumulating grads, which it does by default
         for x, y in dataloader:
             x, y = x.to(device), y.to(device)
             pred = model(x)
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            acc += (pred.argmax(1) == y).type(torch.float).sum().item()
             loss += loss_func(pred, y).item()
+
     loss /= len(dataloader)
-    correct /= len(dataloader.dataset)
-    print(f"Accuracy: {(correct*100):0.1f}% || Average loss: {loss:8f}\n")
+    acc /= len(dataloader.dataset)
+    print(f"Accuracy: {(acc*100):0.1f}% || Average loss: {loss:8f}\n")
+    return acc, loss
 
 def main():
     PATH = "../../data/MNIST/"
@@ -100,10 +110,20 @@ def main():
     train_data, test_data = load_mnist(save_path=PATH)
     train_dataloader, test_dataloader = dataloader(train_data, test_data, batch_size)
 
+    train_losses, train_accs = [], []
+    test_losses, test_accs = [], []
+
     for i in range(epochs):
         print(f"Epoch {i+1}")
-        train(model, train_dataloader, loss_func=loss_func, optim=optim)
-        test(model, test_dataloader, loss_func=loss_func)
+        train_acc, train_loss = train(model, train_dataloader, loss_func=loss_func, optim=optim)
+        test_acc, test_loss = test(model, test_dataloader, loss_func=loss_func)
+
+        train_accs.append(train_acc)
+        train_losses.append(train_loss)
+        test_accs.append(test_acc)
+        test_losses.append(test_loss)
+    acc_loss_plot(train_accs, train_losses, figname="../assets/torch_mlp_train.png")
+    acc_loss_plot(test_accs, test_losses, figname="../assets/torch_mlp_test.png")
 
 #    load_mnist()
 

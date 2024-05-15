@@ -1,23 +1,12 @@
 from dl_from_scratch.utils.dataloader import load_hdf5
+from dl_from_scratch.utils.plot import acc_loss_plot
 
 from math import log
 
 from typing import Callable 
 from tqdm import tqdm
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
-
-def acc_loss_plot(accuracies, losses):
-    x = list(range(1,len(accuracies)+1))
-
-    fig, ax1 = plt.subplots()
-    ax1.plot(x, accuracies,label="Accuracy")
-
-    ax2 = ax1.twinx()
-    ax2.plot(x, losses,label="Loss", color="orange")
-
-    plt.savefig("plot.png")
 
 def logsumexp(x):
     c = x.max(axis=1)
