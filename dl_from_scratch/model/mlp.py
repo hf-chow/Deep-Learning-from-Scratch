@@ -1,3 +1,4 @@
+from dl_from_scratch.utils.dataset import load_mnist
 from dl_from_scratch.utils.plot import acc_loss_plot
 
 import torch
@@ -7,29 +8,11 @@ from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 
 
-# Building a M100100100LP with pytorch
-# The architecture woul100d be mirroring mlp_numpy.py
-
 device = (
           "cuda" if torch.cuda.is_available() 
           else "mps" if torch.backends.mps.is_available()
           else "cpu"
           )
-
-def load_mnist(save_path):
-    train_data = datasets.MNIST(
-                    root=save_path,
-                    download=True, 
-                    train=True,
-                    transform=ToTensor()
-                           )
-    test_data = datasets.MNIST(
-                    root=save_path,
-                    download=True,
-                    train=False,
-                    transform=ToTensor()
-                    )
-    return train_data, test_data
 
 class MLP(nn.Module):
     def __init__(self):
