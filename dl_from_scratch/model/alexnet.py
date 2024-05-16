@@ -7,6 +7,10 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 # Implementation
+# Technically this is not a "pure" AlexNet since the original paper has error in the Conv2D dimensions
+# We follow the "one werid trick" paper's implementation instead
+# https://arxiv.org/abs/1404.5997
+# https://github.com/soumith/imagenet-multiGPU.torch/blob/master/models/alexnetowt.lua
 # Architeture:
 # - Conv2D 3
 # - LocalNorm
@@ -48,7 +52,7 @@ class AlexNet(nn.Module):
         super().__init__()
         self.alexnet = nn.Sequential(
                 nn.Conv2d(in_channels=3, 
-                          out_channels=64,      # Original paper does not yied c 
+                          out_channels=64,      # Original paper does not yield the correct out_channels due to its implementation for dual GPUs, this follows the "one weird trick papers" implementation
                           kernel_size=(11, 11), 
                           stride=4,
                           )
