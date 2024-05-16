@@ -3,7 +3,6 @@ from dl_from_scratch.utils.plot import acc_loss_plot
 
 import torch
 import torch.nn as nn
-from torchvision import datasets
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 
