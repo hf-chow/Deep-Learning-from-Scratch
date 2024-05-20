@@ -1,4 +1,5 @@
 from dl_from_scratch.utils.plot import acc_loss_plot
+from dl_from_scratch.utils.dataset import load_cifar100
 
 import math
 
@@ -40,9 +41,11 @@ device = (
         else "cpu"
         )
 
-def _layer_checker():
-    # Helper function to check the layers dimensions 
+def _layer_checker(net):
     pass
+    # Should refactor to include in the nn classes
+    # Helper function to check the layers dimensions 
+    
 
 def _get_output_size(input_size, kernel_size, stride, padding, dilation=1):
     # Helper function to calculate the out_channels of each conv layers
@@ -109,27 +112,93 @@ class AlexNet(nn.Module):
             logits = self.classifer(x)
             return logits
 
+def dataloader(train, test, batch_size):
+    train_dataloader = DataLoader(train, batch_size=batch_size)
+    test_dataloader = DataLoader(test, batch_size=batch_size)
+    return train_dataloader, test_dataloader
+
+def train(model, dataloader, loss_func, optim):
+    # Set model to training mode, instead of evaluation mode
+    model.train()
+
+    loss, acc = 0, 0
+    for batch, (x, y) in enumerate(dataloader):
+
+        x, y = x.to(device), y.to(device)
+        pred = model(x)
+        loss = loss_func(pred, y)
+
+        loss.backward()
+        # Perform optimization (e.g. gradient descend)
+        optim.step()
+        # Resetting grads for the next epoch
+        optim.zero_grad()
+
+        loss = loss.item() # .item returns the values of the tensor as a Python float
+        acc += (pred.argmax(1) == y).type(torch.float).sum().item()
+
+        # Print status every 100 epochs
+        train_size = len(dataloader.dataset)
+        if batch % 100 == 0:
+            current_prog = (batch + 1)*len(x)
+            print(f"Current loss: {loss} || Progress {current_prog}/{train_size}")
+
+    loss /= len(dataloader)
+    acc /= len(dataloader.dataset)
+    return acc, loss
+
+def test(model, dataloader, loss_func):
+    # Set model to evaluation mode
+    model.eval()
+    loss , acc = 0, 0
+    with torch.no_grad(): # Stop Pytorch from accumulating grads, which it does by default
+        for x, y in dataloader:
+            x, y = x.to(device), y.to(device)
+            pred = model(x)
+            acc += (pred.argmax(1) == y).type(torch.float).sum().item()
+            loss += loss_func(pred, y).item()
+
+    loss /= len(dataloader)
+    acc /= len(dataloader.dataset)
+    print(f"Accuracy: {(acc*100):0.1f}% || Average loss: {loss:8f}\n")
+    return acc, loss
+
+def main():
+#    PATH = "../../data/ImageNet/"
+    PATH = "../../data/CIFAR100/"
+    load_cifar100(PATH)
+    batch_size = 128
+    epochs = 20
+
+    model = AlexNet().to(device)
+    print(model)
+    loss_func = nn.CrossEntropyLoss()
+    optim = torch.optim.SGD(model.parameters(), lr=1e-3)
+
+
+
 if __name__ == "__main__":
-    PATH = "../../data/ImageNet/"
+    main()
+#    PATH = "../../data/ImageNet/"
 
-    out = _get_output_size((224,224), (11,11), padding=2, stride=4)
-    print(f"Conv1: {out} x {out}")
-    out = _get_output_size((out,out), (3,3), padding=0, stride=2)
-    print(f"MaxPool1: {out} x {out}")
-
-    out = _get_output_size((out,out), (5,5), padding=2, stride=1)
-    print(f"Conv2: {out} x {out}")
-    out = _get_output_size((out,out), (3,3), padding=0, stride=2)
-    print(f"MaxPool2: {out} x {out}")
-
-    out = _get_output_size((out,out), (3,3), padding=1, stride=1)
-    print(f"Conv3: {out} x {out}")
-
-    out = _get_output_size((out,out), (3,3), padding=1, stride=1)
-    print(f"Conv4: {out} x {out}")
-
-    out = _get_output_size((out,out), (3,3), padding=1, stride=1)
-    print(f"Conv5: {out} x {out}")
-
-    out = _get_output_size((out,out), (3,3), padding=0, stride=2)
-    print(f"MaxPool3: {out} x {out}")
+#    out = _get_output_size((224,224), (11,11), padding=2, stride=4)
+#    print(f"Conv1: {out} x {out}")
+#    out = _get_output_size((out,out), (3,3), padding=0, stride=2)
+#    print(f"MaxPool1: {out} x {out}")
+#
+#    out = _get_output_size((out,out), (5,5), padding=2, stride=1)
+#    print(f"Conv2: {out} x {out}")
+#    out = _get_output_size((out,out), (3,3), padding=0, stride=2)
+#    print(f"MaxPool2: {out} x {out}")
+#
+#    out = _get_output_size((out,out), (3,3), padding=1, stride=1)
+#    print(f"Conv3: {out} x {out}")
+#
+#    out = _get_output_size((out,out), (3,3), padding=1, stride=1)
+#    print(f"Conv4: {out} x {out}")
+#
+#    out = _get_output_size((out,out), (3,3), padding=1, stride=1)
+#    print(f"Conv5: {out} x {out}")
+#
+#    out = _get_output_size((out,out), (3,3), padding=0, stride=2)
+#    print(f"MaxPool3: {out} x {out}")
