@@ -1,11 +1,12 @@
 from dl_from_scratch.utils.plot import acc_loss_plot
-from dl_from_scratch.utils.dataset import load_cifar100
+from dl_from_scratch.utils.dataset import Dataset
 
 import math
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torchvision.transforms import transforms
 
 # Implementation
 # Technically this is not a "pure" AlexNet since the original paper has error in the Conv2D dimensions
@@ -35,11 +36,16 @@ from torch.utils.data import DataLoader
 # 224 x 224 random cropping
 # Normalizing RGB
 
+#TO DO enable training on ImageNet
+#TO DO RGB normalization with zero mean and STD 0.1
+
 device = (
         "cuda" if torch.cuda.is_available()
         else "mps" if torch.backends.mps.is_available()
         else "cpu"
         )
+
+PYTORCH_ENABLE_MPS_FALLBACK=1
 
 def _layer_checker(net):
     pass
@@ -65,7 +71,7 @@ class AlexNet(nn.Module):
                           stride=4,
                           padding=(2,2)
                           ),
-                nn.ReLu(inplace=True),  # Inplace preserve a little bit more memory
+                nn.ReLU(inplace=True),  # Inplace preserve a little bit more memory
                 nn.LocalResponseNorm(size=5, k=2),
                 nn.MaxPool2d(kernel_size=(3,3), stride=2), #Section 3.4, the paper opt for overlapping maxpool
                 nn.Conv2d(in_channels=64, 
@@ -73,7 +79,7 @@ class AlexNet(nn.Module):
                           kernel_size=(5,5),
                           stride=1,
                           padding=(2,2)),
-                nn.ReLu(inplace=True),
+                nn.ReLU(inplace=True),
                 nn.LocalResponseNorm(size=5, k=2),
                 nn.MaxPool2d(kernel_size=(3,3), stride=2),
                 nn.Conv2d(in_channels=192, 
@@ -81,24 +87,24 @@ class AlexNet(nn.Module):
                           kernel_size=(3,3),
                           stride=1,
                           padding=(1,1)),
-                nn.ReLu(inplace=True),
+                nn.ReLU(inplace=True),
                 nn.Conv2d(in_channels=384, 
                           out_channels=256, 
                           kernel_size=(3,3),
                           stride=1,
                           padding=(1,1)),
-                nn.ReLu(inplace=True),
+                nn.ReLU(inplace=True),
                 nn.Conv2d(in_channels=256, 
                           out_channels=256, 
                           kernel_size=(3,3),
                           stride=1,
                           padding=(1,1)),
-                nn.ReLu(inplace=True),
+                nn.ReLU(inplace=True),
                 )
-        self.maxpool = nn.MaxPool2d(kernel_size=(3,3), stride=2)
+        self.maxpool = nn.MaxPool2d(kernel_size=(3, 3), stride=2)
         self.classifer = nn.Sequential(
                 nn.Dropout(0.5),
-                nn.Linear(in_features=256*6*6, out_features=4096),
+                nn.Linear(in_features=(256*6*6), out_features=4096),
                 nn.ReLU(inplace=True),
                 nn.Dropout(0.5),
                 nn.Linear(in_features=4096, out_features=4096),
@@ -106,9 +112,10 @@ class AlexNet(nn.Module):
                 nn.Linear(in_features=4096, out_features=1000),
                 )
 
-        def forward(self, x):
+    def forward(self, x):
             x = self.features(x)
             x = self.maxpool(x)
+            x = x.view(-1, 256*6*6)
             logits = self.classifer(x)
             return logits
 
@@ -139,13 +146,13 @@ def train(model, dataloader, loss_func, optim):
 
         # Print status every 100 epochs
         train_size = len(dataloader.dataset)
-        if batch % 100 == 0:
+        if batch % 10 == 0:
             current_prog = (batch + 1)*len(x)
             print(f"Current loss: {loss} || Progress {current_prog}/{train_size}")
 
     loss /= len(dataloader)
     acc /= len(dataloader.dataset)
-    return acc, loss
+    return loss, acc
 
 def test(model, dataloader, loss_func):
     # Set model to evaluation mode
@@ -161,21 +168,45 @@ def test(model, dataloader, loss_func):
     loss /= len(dataloader)
     acc /= len(dataloader.dataset)
     print(f"Accuracy: {(acc*100):0.1f}% || Average loss: {loss:8f}\n")
-    return acc, loss
+    return loss, acc
 
 def main():
 #    PATH = "../../data/ImageNet/"
-    PATH = "../../data/CIFAR100/"
-    load_cifar100(PATH)
-    batch_size = 128
+    PATH = "../../data/Imagenette/"
     epochs = 20
+    batch_size = 64
+
+    trans = transforms.Compose([
+            transforms.RandomCrop(227, 227),
+#            transforms.RandomCrop((224,224)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor()
+            ])
+
+    train_data, test_data = Dataset.load_imagenette(save_path=PATH, download=False, transform_func=trans)
+    train_dataloader, test_dataloader = dataloader(train_data, test_data, batch_size)
 
     model = AlexNet().to(device)
     print(model)
     loss_func = nn.CrossEntropyLoss()
-    optim = torch.optim.SGD(model.parameters(), lr=1e-3)
+    # SGD
+#    optim = torch.optim.SGD(model.parameters(), lr=5e-3)
+    # Adam
+    optim = torch.optim.Adam(model.parameters(), lr=5e-3)
+    train_losses, train_accs = [], []
+    test_losses, test_accs = [], []
 
+    for i in range(epochs):
+        print(f"Epoch {i+1}")
+        train_loss, train_acc = train(model, train_dataloader, loss_func=loss_func, optim=optim)
+        test_loss, test_acc = test(model, test_dataloader, loss_func=loss_func)
 
+        train_accs.append(train_acc)
+        train_losses.append(train_loss)
+        test_accs.append(test_acc)
+        test_losses.append(test_loss)
+    acc_loss_plot(train_accs, train_losses, figname="../assets/alexnet_train.png")
+    acc_loss_plot(test_accs, test_losses, figname="../assets/alexnet_test.png")
 
 if __name__ == "__main__":
     main()
