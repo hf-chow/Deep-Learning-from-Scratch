@@ -192,7 +192,7 @@ def main():
     # SGD
 #    optim = torch.optim.SGD(model.parameters(), lr=5e-3)
     # Adam
-    optim = torch.optim.Adam(model.parameters(), lr=5e-3)
+    optim = torch.optim.Adam(model.parameters(), lr=1e-3)
     train_losses, train_accs = [], []
     test_losses, test_accs = [], []
 
