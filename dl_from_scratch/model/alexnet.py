@@ -119,9 +119,10 @@ class AlexNet(nn.Module):
             logits = self.classifer(x)
             return logits
 
+# TODO Add normalization
 def dataloader(train, test, batch_size):
-    train_dataloader = DataLoader(train, batch_size=batch_size)
-    test_dataloader = DataLoader(test, batch_size=batch_size)
+    train_dataloader = DataLoader(train, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test, batch_size=batch_size, shuffle=True)
     return train_dataloader, test_dataloader
 
 def train(model, dataloader, loss_func, optim):
@@ -176,12 +177,21 @@ def main():
     epochs = 20
     batch_size = 64
 
-    trans = transforms.Compose([
-            transforms.RandomCrop(227, 227),
+    train_trans = transforms.Compose([
+#            transforms.Resize((227, 227)),
+            transforms.RandomCrop((227, 227)),
 #            transforms.RandomCrop((224,224)),
             transforms.RandomHorizontalFlip(),
-            transforms.ToTensor()
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ])
+    test_trans = transforms.Compose([
+        transforms.Resize((227, 227)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+    trans = (train_trans, test_trans)
 
     train_data, test_data = Dataset.load_imagenette(save_path=PATH, download=False, transform_func=trans)
     train_dataloader, test_dataloader = dataloader(train_data, test_data, batch_size)
@@ -190,9 +200,9 @@ def main():
     print(model)
     loss_func = nn.CrossEntropyLoss()
     # SGD
-#    optim = torch.optim.SGD(model.parameters(), lr=5e-3)
+    optim = torch.optim.SGD(model.parameters(), lr=5e-3, weight_decay=5e-3, momentum=0.9)
     # Adam
-    optim = torch.optim.Adam(model.parameters(), lr=1e-3)
+#    optim = torch.optim.Adam(model.parameters(), lr=1e-3)
     train_losses, train_accs = [], []
     test_losses, test_accs = [], []
 
