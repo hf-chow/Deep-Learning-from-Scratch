@@ -109,7 +109,7 @@ class Dataset:
                     )
             test_data = datasets.Imagenette(
                     root=save_path,
-                    split = "test",
+                    split = "train",
                     size = "320px",
                     download=download,
                     transform=ToTensor()
@@ -121,14 +121,14 @@ class Dataset:
                     split = "train",
                     size = "320px",
                     download=download,
-                    transform=transform_func
+                    transform=transform_func[0]
                     )
             test_data = datasets.Imagenette(
                     root=save_path,
-                    split = "val",
+                    split = "train",
                     size = "320px",
                     download=download,
-                    transform=transform_func
+                    transform=transform_func[1]
                     )
 
         return train_data, test_data
@@ -175,7 +175,7 @@ def load_cifar100(save_path, transform_func=None):
         test_data = datasets.CIFAR100(
                 root=save_path,
                 download=True,
-                train=False,
+                train=True,
                 transform=ToTensor()
                 )
     else:
@@ -189,7 +189,7 @@ def load_cifar100(save_path, transform_func=None):
         test_data = datasets.CIFAR100(
                 root=save_path,
                 download=True,
-                train=False,
+                train=True,
                 transform=transform_func
                 )
 
