@@ -3,45 +3,43 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 import numpy as np
 
-def normalize_2d(dataset):
+
+# TODO improve performance with vectorization or Cython
+def normalize_2d(dataset, batch_size=1024, shuffle=False):
     # Normalize the 0-255 RGB values to 0-1
     # A 2d RGB image actually has a 3D tensor = [(RGB), W, H]
     # We would like to extract the mean R, G and B  values across the W and H
     # And recall that the first index of dataloader is the number of image in the batch
     # Using numpy's syntax, we will compile mean and std across axis = (0, 2, 3)
-    dataloader = DataLoader(dataset, batch_size=1024, shuffle=False)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+    batch_means = []
+    batch_stds = []
+    for batch, (image, target) in enumerate(dataloader):
+        sample_means = []
+        sample_stds = []
+        for sample in range(image.shape[0]):
+            current_sample = image[sample, :, :, :].numpy()
+            channel_means =  []
+            channel_stds = []
+            for channel in range(current_sample.shape[0]):
+                channel_means.append(np.mean(current_sample[channel,:, :]))
+                channel_stds.append(np.std(current_sample[channel, :, :]))
+            sample_means.append(channel_means)
+            sample_stds.append(channel_stds)
+
+        batch_means.append(np.mean(np.array(sample_means), axis=0))
+        batch_stds.append(np.mean(np.array(sample_stds), axis=0))
+    means = list(np.mean(batch_means, axis = 0))
+    stds = list(np.mean(batch_stds, axis = 0))
+
+    return means, stds
 
 def main():
     PATH = "../../data/CIFAR100/"
     cifar = datasets.CIFAR100(PATH, download=False, transform=ToTensor())
-    dataloader = DataLoader(cifar, batch_size=1024, shuffle=False)
-
-    means = []
-    stds = []
-    image_means = []
-    image_stds = []
-
-    for i, (image, target) in enumerate(dataloader):
-        np_image = image.numpy()
-        np_image_R = np_image[1][0]
-        np_image_G = np_image[1][1]
-        np_image_B = np_image[1][2]
-        channels = (np_image_R, np_image_G, np_image_B)
-        for channel in channels:
-            channel_means = np.mean(channel)
-            channel_stds = np.std(channel)
-            image_means.append(channel_means)
-            image_stds.append(channel_stds)
-            print(len(image_means))
-        means.append(image_means)
-        stds.append(image_stds)
-
-    print(len(means))
-    print(len(means[0]))
-
-           
-
-
+    means, stds = normalize_2d(cifar)
+    print(means, stds)
 
 if __name__ == "__main__":
     main()
