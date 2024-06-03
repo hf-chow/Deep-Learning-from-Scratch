@@ -4,7 +4,13 @@ import torch.nn as nn
 from dl_from_scratch.module.batchnorm import BatchNorm
 
 class BasicBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+    def __init__(self, 
+                 in_channels, 
+                 out_channels, 
+                 kernel_size=3, 
+                 stride=1, 
+                 padding=1,
+                 downsample=None):
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels=in_channels,
                           out_channels=out_channels,
@@ -19,6 +25,7 @@ class BasicBlock(nn.Module):
 
         self.relu = nn.ReLU()
         self.bn = nn.BatchNorm2d(out_channels)
+        self.downsample = downsample
 
     def forward(self, x):
         identity = x
@@ -28,7 +35,10 @@ class BasicBlock(nn.Module):
 
         x = self.conv2(x)
         x = self.bn(x)
-        x += identity
+        if self.downsample is None:
+            x += identity
+        else:
+            x += self.downsample(identity)
         x = self.relu(x)
         
         return x
@@ -44,11 +54,28 @@ def test():
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
             )
-    bb = BasicBlock(in_channels=64, out_channels=64)
+    mp = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+    
+    ds1 = nn.Conv2d(64, 128, kernel_size=1)
+    ds2 = nn.Conv2d(128, 256, kernel_size=1)
+    ds3 = nn.Conv2d(256, 512, kernel_size=1)
+
+    bb1 = BasicBlock(in_channels=64, out_channels=64)
+    bb2 = BasicBlock(in_channels=64, out_channels=128, downsample=ds1)
+    bb3 = BasicBlock(in_channels=128, out_channels=256, downsample=ds2)
+    bb4 = BasicBlock(in_channels=256, out_channels=512, downsample=ds3)
+
+
 
     x = torch.rand(256, 3, 224, 224)
     x = conv1(x)
-    x = bb(x)
+    x = bb1(x)
+    x = mp(x)
+    x = bb2(x)
+    x = mp(x)
+    x = bb3(x)
+    x = mp(x)
+    x = bb4(x)
 
 if __name__ == "__main__":
     test()
