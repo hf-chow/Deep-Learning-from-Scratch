@@ -1,7 +1,9 @@
+from collections import deque
+
 import torch
 import torch.nn as nn
-
 from dl_from_scratch.module.batchnorm import BatchNorm
+
 
 class BasicBlock(nn.Module):
     def __init__(self, 
@@ -43,39 +45,80 @@ class BasicBlock(nn.Module):
         
         return x
 
+class ResNet(nn.Module):
+    def __init__(self, layers):
+        super().__init__()
+        self.layers = deque(layers)
+        self.resnet_layers = self.get_layers(self.layers)
+
+    def get_layers(self, downsampling=False):
+        resnet_layers = nn.Sequential(
+                nn.Conv2d(in_channels=3,
+                          out_channels=64,
+                          kernel_size=(7, 7),
+                          stride=2,
+                          padding=3))
+        maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        while len(self.layers) > 1:
+            current_layer = self.layers.popleft()
+            next_layer = self.layers[0]
+            if current_layer == next_layer:
+                resnet_layers.append(BasicBlock(in_channels=current_layer,
+                                                out_channels=next_layer))
+                resnet_layers.append(maxpool)
+            else:
+                resnet_layers.append(
+                        BasicBlock(in_channels=current_layer,
+                                   out_channels=next_layer,
+                                   downsample=nn.Conv2d(in_channels=current_layer,
+                                                        out_channels=next_layer,
+                                                        kernel_size=(1, 1))))
+                resnet_layers.append(maxpool)
+        return resnet_layers
+
+    def forward(self, x):
+        x = self.resnet_layers(x)
+
+
 def test():
-    conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=3,
-                      out_channels=64,
-                      kernel_size=(7,7),
-                      stride=2,
-                      padding=3),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-            )
-    mp = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-    
-    ds1 = nn.Conv2d(64, 128, kernel_size=1)
-    ds2 = nn.Conv2d(128, 256, kernel_size=1)
-    ds3 = nn.Conv2d(256, 512, kernel_size=1)
-
-    bb1 = BasicBlock(in_channels=64, out_channels=64)
-    bb2 = BasicBlock(in_channels=64, out_channels=128, downsample=ds1)
-    bb3 = BasicBlock(in_channels=128, out_channels=256, downsample=ds2)
-    bb4 = BasicBlock(in_channels=256, out_channels=512, downsample=ds3)
-
-
-
+    layers = [64, 64, 128, 256, 512]
+    rn = ResNet(layers)
+    print(rn)
     x = torch.rand(256, 3, 224, 224)
-    x = conv1(x)
-    x = bb1(x)
-    x = mp(x)
-    x = bb2(x)
-    x = mp(x)
-    x = bb3(x)
-    x = mp(x)
-    x = bb4(x)
+    x = rn(x)
+
+#    conv1 = nn.Sequential(
+#            nn.Conv2d(in_channels=3,
+#                      out_channels=64,
+#                      kernel_size=(7,7),
+#                      stride=2,
+#                      padding=3),
+#            nn.BatchNorm2d(64),
+#            nn.ReLU(),
+#            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+#            )
+#    mp = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+#    
+#    ds1 = nn.Conv2d(64, 128, kernel_size=1)
+#    ds2 = nn.Conv2d(128, 256, kernel_size=1)
+#    ds3 = nn.Conv2d(256, 512, kernel_size=1)
+#
+#    bb1 = BasicBlock(in_channels=64, out_channels=64)
+#    bb2 = BasicBlock(in_channels=64, out_channels=128, downsample=ds1)
+#    bb3 = BasicBlock(in_channels=128, out_channels=256, downsample=ds2)
+#    bb4 = BasicBlock(in_channels=256, out_channels=512, downsample=ds3)
+#
+#
+#
+#    x = torch.rand(256, 3, 224, 224)
+#    x = conv1(x)
+#    x = bb1(x)
+#    x = mp(x)
+#    x = bb2(x)
+#    x = mp(x)
+#    x = bb3(x)
+#    x = mp(x)
+#    x = bb4(x)
 
 if __name__ == "__main__":
     test()
