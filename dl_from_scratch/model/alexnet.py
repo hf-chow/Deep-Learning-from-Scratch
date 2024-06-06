@@ -1,5 +1,7 @@
 from dl_from_scratch.utils.plot import acc_loss_plot
+
 from dl_from_scratch.utils.dataset import Dataset
+from dl_from_scratch.utils.normalizer import normalize_2d
 
 import math
 
@@ -177,6 +179,11 @@ def main():
     epochs = 20
     batch_size = 64
 
+    #TOFIX: integrate normalize_2d
+#    _train_data, _ = Dataset.load_imagenette(save_path=PATH, download=False)
+#    means, stds = normalize_2d(dataset)
+
+
     train_trans = transforms.Compose([
 #            transforms.Resize((227, 227)),
             transforms.RandomCrop((227, 227)),
@@ -195,6 +202,7 @@ def main():
 
     train_data, test_data = Dataset.load_imagenette(save_path=PATH, download=False, transform_func=trans)
     train_dataloader, test_dataloader = dataloader(train_data, test_data, batch_size)
+    print(train_data[0])
 
     model = AlexNet().to(device)
     print(model)
