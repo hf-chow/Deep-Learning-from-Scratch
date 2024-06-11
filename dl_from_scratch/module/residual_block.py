@@ -81,7 +81,7 @@ class ResNet(nn.Module):
 
 
 def test():
-    layers = [64, 64, 128, 256, 512]
+    layers = [64, 64, 64, 64, 128, 128, 128, 128, 256, 256, 256, 256, 256, 256, 512, 512, 512]
     rn = ResNet(layers)
     print(rn)
     x = torch.rand(256, 3, 224, 224)

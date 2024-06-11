@@ -5,7 +5,7 @@ import numpy as np
 
 
 # TODO improve performance with vectorization or Cython
-def normalize_2d(dataset, batch_size=1024, shuffle=False):
+def normalize_2d(dataset, batch_size=512, shuffle=False):
     # Normalize the 0-255 RGB values to 0-1
     # A 2d RGB image actually has a 3D tensor = [(RGB), W, H]
     # We would like to extract the mean R, G and B  values across the W and H
