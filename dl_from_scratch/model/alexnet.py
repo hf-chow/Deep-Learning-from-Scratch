@@ -179,10 +179,13 @@ def main():
     epochs = 20
     batch_size = 64
 
-    #TOFIX: integrate normalize_2d
-#    _train_data, _ = Dataset.load_imagenette(save_path=PATH, download=False)
-#    means, stds = normalize_2d(dataset)
-
+    _train_data = datasets.Imagenette(root=PATH, 
+                                      split="train", 
+                                      size="320px", 
+                                      transform=transforms.Compose(
+                                          [transforms.RandomCrop(227,227), 
+                                           transforms.ToTensor()]))
+    means, stds = normalize_2d(_train_data)
 
     train_trans = transforms.Compose([
 #            transforms.Resize((227, 227)),
@@ -190,19 +193,18 @@ def main():
 #            transforms.RandomCrop((224,224)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            transforms.Normalize(mean=means, std=stds)
             ])
     test_trans = transforms.Compose([
         transforms.Resize((227, 227)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=means, std=stds)
         ])
 
     trans = (train_trans, test_trans)
 
     train_data, test_data = Dataset.load_imagenette(save_path=PATH, download=False, transform_func=trans)
     train_dataloader, test_dataloader = dataloader(train_data, test_data, batch_size)
-    print(train_data[0])
 
     model = AlexNet().to(device)
     print(model)
